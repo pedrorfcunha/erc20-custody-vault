@@ -2,12 +2,14 @@
 pragma solidity ^0.8.9;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "hardhat/console.sol";
 
+error CustodyVault__NotTrustee();
+
 contract CustodyVault {
     struct Deposit {
+        uint256 batchId;
         uint256 depositId;
         address senderAddress;
         address receiverAddress;
@@ -25,27 +27,52 @@ contract CustodyVault {
     mapping(address => uint256) public balances;
     mapping(uint256 => Deposit) public deposits;
     uint256 public counter;
-    address[] private allowedTokens;
-    address[] private allowedAddresses;
+    mapping(address => bool) private allowedTokens;
+    mapping(address => bool) private allowedSenders;
+    mapping(address => bool) private trusteeAddress;
 
-    function setAllowedTokens(address _token) public returns (address) {
-        allowedTokens.push(_token);
-        return _token;
+    modifier onlyTrustee() {
+        if (!trusteeAddress[msg.sender]) revert CustodyVault__NotTrustee();
+        _;
     }
 
-    function setAllowedAddresses(address _address) public returns (address) {
-        allowedAddresses.push(_address);
-        return _address;
+    constructor() {
+        trusteeAddress[msg.sender] = true;
+    }
+
+    function setTrusteeAddress(address _address) public onlyTrustee {
+        trusteeAddress[_address] = true;
+    }
+
+    function removeTrusteeAddress(address _address) public onlyTrustee {
+        trusteeAddress[_address] = false;
+    }
+
+    function setAllowedTokens(address _token) public onlyTrustee {
+        allowedTokens[_token] = true;
+    }
+
+    function removeAllowedTokens(address _address) public onlyTrustee {
+        allowedTokens[_address] = false;
+    }
+
+    function setAllowedSenders(address _address) public onlyTrustee {
+        allowedSenders[_address] = true;
+    }
+
+    function removeAllowedSenders(address _address) public onlyTrustee {
+        allowedSenders[_address] = false;
     }
 
     function deposit(
         address _token,
         uint256 _amount,
-        address _receiverAddress
+        address _receiverAddress,
+        uint256 _batchId
     ) public {
         IERC20 token = IERC20(_token);
 
-        // If necessaary, set the minimum amount to X token
+        // Set the minimum amount to X token
         // uint256 _minAmount = 1 * (10 ** );
 
         // Here we validate if the amount sent is enough
@@ -71,6 +98,7 @@ contract CustodyVault {
 
         // Store the deposit details with the current counter value as depositId
         deposits[counter] = Deposit(
+            _batchId,
             counter,
             msg.sender,
             _receiverAddress,
@@ -122,21 +150,15 @@ contract CustodyVault {
     }
 
     function isTokenAllowed(address _token) public view returns (bool) {
-        for (uint256 i = 0; i < allowedTokens.length; i++) {
-            if (_token == allowedTokens[i]) {
-                return true;
-            }
-        }
-        return false;
+        return allowedTokens[_token];
     }
 
     function isAddressAllowed(address _address) public view returns (bool) {
-        for (uint256 i = 0; i < allowedAddresses.length; i++) {
-            if (_address == allowedAddresses[i]) {
-                return true;
-            }
-        }
-        return false;
+        return allowedSenders[_address];
+    }
+
+    function isTrustee(address _address) public view returns (bool) {
+        return trusteeAddress[_address];
     }
 
     function isBalanceEnought(address _token, uint256 _amount)
@@ -179,11 +201,26 @@ contract CustodyVault {
 
         return "";
     }
+
+    function getMaxBatchId() public view returns (uint256) {
+        uint256 maxBatchId = 0;
+
+        for (uint256 i = 0; i < counter; i++) {
+            if (deposits[i].batchId > maxBatchId) {
+                maxBatchId = deposits[i].batchId;
+            }
+        }
+
+        return maxBatchId;
+    }
+
+    function getAllDeposits() public view returns (Deposit[] memory) {
+        Deposit[] memory allDeposits = new Deposit[](counter);
+
+        for (uint256 i = 0; i < counter; i++) {
+            allDeposits[i] = deposits[i];
+        }
+
+        return allDeposits;
+    }
 }
-
-
-// Missing:
-// 1. Set access control (only a trustee may set allowedAddresses and allowedTokens)
-// 2. Create a simple front-end to interact with the contract
-// 3. Understand how creating events can improve/optimize the code
-// 4. Understand how to improve the approval/permit requirement of the ERC20 token

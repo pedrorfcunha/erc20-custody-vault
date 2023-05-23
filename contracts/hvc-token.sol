@@ -15,4 +15,8 @@ contract HVC is ERC20, AccessControl, ERC20Permit {
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
     }
+
+    function getTokenAddress() public view returns (address) {
+        return address(this);
+    }
 }

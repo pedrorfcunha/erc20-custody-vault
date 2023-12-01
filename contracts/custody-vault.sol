@@ -71,13 +71,6 @@ contract CustodyVault {
         uint256 _batchId
     ) public {
         IERC20 token = IERC20(_token);
-
-        // Set the minimum amount to X token
-        // uint256 _minAmount = 1 * (10 ** );
-
-        // Here we validate if the amount sent is enough
-        // require(_amount >= _minAmount, "Amount less than the minimum amount");
-
         // Validate if the ERC20 token matches the requirement/is registered
         require(isTokenAllowed(_token), "Token not allowed");
 
@@ -85,8 +78,6 @@ contract CustodyVault {
         require(isAddressAllowed(msg.sender), "Address not registered");
 
         // Validate the sender's ERC20 token balance
-        // uint256 _balance = token.balanceOf(msg.sender);
-        // require(_balance >= _amount, "Account with insufficient funds");
         require(
             isBalanceEnought(_token, _amount),
             "Account with insufficient funds"
@@ -111,7 +102,7 @@ contract CustodyVault {
         counter = counter + 1;
     }
 
-    function approveTransfer(uint256 _depositId) public {
+    function approveTransfer(uint256 _depositId) public onlyTrustee {
         Deposit storage depositData = deposits[_depositId];
 
         // Ensure the deposit is valid and the status is Pending
@@ -130,7 +121,7 @@ contract CustodyVault {
         depositData.status = DepositStatus.Transferred;
     }
 
-    function revertTransfer(uint256 _depositId) public {
+    function revertTransfer(uint256 _depositId) public onlyTrustee {
         Deposit storage depositData = deposits[_depositId];
 
         // Ensure the deposit is valid and the status is Pending
